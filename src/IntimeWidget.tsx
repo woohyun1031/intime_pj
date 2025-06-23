@@ -134,7 +134,7 @@ const IntimeWidget: React.FC = () => {
         return sorted[sorted.length - 1].date;
     }, [entries]);
 
-    // Calculate display text (money to time)
+    // Calculate display text (second format)
     const calcText = useCallback((s: number) => {
         let rem = s;
         const Y = Math.floor(rem / (365 * 24 * 3600));
@@ -152,7 +152,17 @@ const IntimeWidget: React.FC = () => {
         }${H}시간 ${m}분 ${sec}초`;
     }, []);
 
+    const calcBalance = useCallback((s: number) => {
+        // s: 초
+        const days = s / (24 * 3600);
+        const hrs = days * WORK_HOURS_PER_DAY;
+        const amount = Math.floor(hrs * MIN_WAGE);
+        return amount;
+    }, []);
+
     const calculatedText = useMemo(() => calcText(seconds), [calcText, seconds]);
+    const calculatedBalance = useMemo(() => calcBalance(seconds), [calcBalance, seconds]);
+
     const isWarning = useMemo(() => seconds > 0 && seconds <= 59, [seconds]);
 
     // Handle input (only update balance, not countdown)
@@ -170,9 +180,11 @@ const IntimeWidget: React.FC = () => {
             .slice(0, 19); // 'YYYY-MM-DD HH:MM:SS' (KST)
 
         const _amount = parseFloat(balance.replace(/,/g, '')) || 0;
+        // 금액을 최저 시급으로 나누어 시간 단위로 변환
         const hrs = _amount / MIN_WAGE;
+        // 시간 단위를 하루 단위로 변환
         const days = hrs / WORK_HOURS_PER_DAY;
-
+        // 하루 단위를 초 단위로 변환
         const _seconds = Math.floor(days * 24 * 3600);
 
         const entry: Entry = {
@@ -212,7 +224,11 @@ const IntimeWidget: React.FC = () => {
             if (!latestDate) return;
             localStorage.setItem(
                 'intimeEntries',
-                JSON.stringify(entries.map((e) => (e.date === latestDate ? { ...e, seconds } : e)))
+                JSON.stringify(
+                    entries.map((e) =>
+                        e.date === latestDate ? { ...e, seconds, amount: balance } : e
+                    )
+                )
             );
         };
         window.addEventListener('beforeunload', handleSave);
@@ -231,13 +247,10 @@ const IntimeWidget: React.FC = () => {
                 (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
             );
             const latest = sorted[sorted.length - 1];
+            console.log(latest);
             // Calculate seconds based on latest amount
-            const amountNum = latest.amount; // 최근 금액
-            const hrs = amountNum / MIN_WAGE; // 시간 단위로 변환
-            const daysCalc = hrs / WORK_HOURS_PER_DAY; // 일 단위로 변환
-
             setBalance(latest.amount.toString());
-            setSeconds(Math.floor(daysCalc * 24 * 3600));
+            setSeconds(latest.seconds);
         }
     }, [entries]);
 
@@ -256,11 +269,12 @@ const IntimeWidget: React.FC = () => {
                     const diffSec = Math.floor(
                         (now.getTime() - new Date(latest.date).getTime()) / 1000
                     );
-                    console.log(new Date(now.getTime()), new Date(latest.date));
-                    console.log(diffSec);
-                    const wagePerSec = MIN_WAGE / (WORK_HOURS_PER_DAY * 3600);
+                    console.log('diffSec', diffSec); // 순차적으로 잘 나옴 (정상)
+                    console.log('latest_ seconds', latest.seconds); // 급진적으로 나옴
                     const _seconds = Math.max(latest.seconds - diffSec, 0);
-                    const _amount = Math.floor(Math.max(latest.amount - diffSec * wagePerSec, 0));
+                    console.log('_seconds', _seconds); // 급진적으로 나옴
+                    const _amount = calcBalance(_seconds);
+                    console.log('_amount', _amount); // 급진적으로 나옴
                     const updated = parsed.map((e) =>
                         e.date === latest.date
                             ? {
@@ -270,6 +284,7 @@ const IntimeWidget: React.FC = () => {
                               }
                             : e
                     );
+                    console.log(updated);
                     setIsInitialized(true);
                     return updated;
                 }
@@ -312,8 +327,11 @@ const IntimeWidget: React.FC = () => {
                         <div key={i} css={entryItem}>
                             <span>
                                 {e.date.slice(5, 10)}:{' '}
-                                {e.date !== latestDate ? calcText(e.seconds) : calcText(seconds)} (₩
-                                {e.amount.toLocaleString()})
+                                {e.date !== latestDate ? calcText(e.seconds) : calculatedText} (
+                                {e.date !== latestDate
+                                    ? e.amount.toLocaleString()
+                                    : calculatedBalance}
+                                ₩)
                             </span>
                             {e.date !== latestDate && (
                                 <button onClick={() => onDelete(e.date)} css={deleteBtnStyle}>
