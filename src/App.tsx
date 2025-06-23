@@ -4,7 +4,7 @@ import {css} from "@emotion/react";
 function App() {
   return (
       <div css={css`
-        width: 100dvw;
+        width: 100vw;
         height: 100dvh;
         display: flex;
         flex-direction: column;
