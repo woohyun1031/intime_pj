@@ -7,6 +7,7 @@ interface Entry {
     seconds: number;
     amount: number;
 }
+// 최저시급으로 8시간 기준 24시간 생존
 const MIN_WAGE = 10030; // 최저시급 (2025년 기준, 원화)
 const WORK_HOURS_PER_DAY = 8; // 하루 근무 시간 (8시간)
 const MAX_AMOUNT = 100_000_000_000; // 최대 금액 (1000억 원)
@@ -16,6 +17,18 @@ const fadeIn = keyframes`
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
 `;
+
+const defaultValue = [
+    {
+        date: '2025-01-01 00:00:00',
+        seconds: 8 * 60 * 60, // 8시간(초 단위)
+        amount: 8 * MIN_WAGE, // 8시간 기준 금액
+    },{
+        date: '2025-01-02 00:00:00',
+        seconds: 8 * 60 * 60, // 8시간(초 단위)
+        amount: 8 * MIN_WAGE, // 8시간 기준 금액
+    }
+]
 
 // Layout styles
 type StyleProps = { warning?: boolean };
@@ -178,8 +191,8 @@ const IntimeWidget: React.FC = () => {
             .toISOString()
             .replace('T', ' ')
             .slice(0, 19); // 'YYYY-MM-DD HH:MM:SS' (KST)
-
-        const _amount = parseFloat(balance.replace(/,/g, '')) || 0;
+        const _balance = String(balance)
+        const _amount = parseFloat((_balance)?.replace(/,/g, '')) || 0;
         // 금액을 최저 시급으로 나누어 시간 단위로 변환
         const hrs = _amount / MIN_WAGE;
         // 시간 단위를 하루 단위로 변환
@@ -218,27 +231,6 @@ const IntimeWidget: React.FC = () => {
         return () => clearInterval(id);
     }, [seconds]);
 
-    // Persist current countdown on unload or unmount
-    useEffect(() => {
-        const handleSave = () => {
-            if (!latestDate) return;
-            localStorage.setItem(
-                'intimeEntries',
-                JSON.stringify(
-                    entries.map((e) =>
-                        e.date === latestDate ? { ...e, seconds, amount: balance } : e
-                    )
-                )
-            );
-        };
-        window.addEventListener('beforeunload', handleSave);
-
-        return () => {
-            handleSave(); // also save on component unmount
-            window.removeEventListener('beforeunload', handleSave);
-        };
-    }, []);
-
     // Initialize input and countdown from latest entry
     useEffect(() => {
         if (entries.length > 0) {
@@ -246,11 +238,17 @@ const IntimeWidget: React.FC = () => {
             const sorted = [...entries].sort(
                 (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
             );
+            const now = new Date();
             const latest = sorted[sorted.length - 1];
-            console.log(latest);
-            // Calculate seconds based on latest amount
-            setBalance(latest.amount.toString());
-            setSeconds(latest.seconds);
+
+            const diffSec = Math.floor(
+                (now.getTime() - new Date(latest.date).getTime()) / 1000
+            );
+            const _seconds = Math.max(latest.seconds - diffSec, 0);
+            const _amount = latest.amount;
+
+            setBalance(_amount);
+            setSeconds(_seconds);
         }
     }, [entries]);
 
@@ -261,35 +259,11 @@ const IntimeWidget: React.FC = () => {
                 const stored = localStorage.getItem('intimeEntries');
                 if (stored) {
                     const parsed: Entry[] = JSON.parse(stored);
-                    const now = new Date();
-                    const latest = parsed.reduce(
-                        (a, b) => (new Date(a.date) > new Date(b.date) ? a : b),
-                        parsed[0]
-                    );
-                    const diffSec = Math.floor(
-                        (now.getTime() - new Date(latest.date).getTime()) / 1000
-                    );
-                    console.log('diffSec', diffSec); // 순차적으로 잘 나옴 (정상)
-                    console.log('latest_ seconds', latest.seconds); // 급진적으로 나옴
-                    const _seconds = Math.max(latest.seconds - diffSec, 0);
-                    console.log('_seconds', _seconds); // 급진적으로 나옴
-                    const _amount = calcBalance(_seconds);
-                    console.log('_amount', _amount); // 급진적으로 나옴
-                    const updated = parsed.map((e) =>
-                        e.date === latest.date
-                            ? {
-                                  ...e,
-                                  seconds: _seconds,
-                                  amount: _amount,
-                              }
-                            : e
-                    );
-                    console.log(updated);
                     setIsInitialized(true);
-                    return updated;
-                }
+                    return parsed;
+                    }
                 setIsInitialized(true);
-                return [];
+                return defaultValue;
             } catch {
                 setIsInitialized(true);
                 return [];
