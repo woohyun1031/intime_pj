@@ -29,7 +29,7 @@
     "noUncheckedSideEffectImports": true,
     "composite": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["vite-plugin-svgr/client", "@emotion/react"]
+    "types": ["@emotion/react"]
   },
   "include": [
     "src",

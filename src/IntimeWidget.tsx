@@ -245,7 +245,7 @@ const IntimeWidget: React.FC = () => {
                 (now.getTime() - new Date(latest.date).getTime()) / 1000
             );
             const _seconds = Math.max(latest.seconds - diffSec, 0);
-            const _amount = latest.amount;
+            const _amount = String(latest.amount);
 
             setBalance(_amount);
             setSeconds(_seconds);
